@@ -1,0 +1,7 @@
+{
+  "name": "SigmaSMS Balance Bot",
+  "description": "Telegram-бот для мониторинга баланса SigmaSMS в реальном времени с гибкими уровнями оповещений и поддержкой 200+ пользователей.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

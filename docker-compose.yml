@@ -1,0 +1,19 @@
+services:
+  sigmabalance-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sigmabalance_bot
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - DEFAULT_SIGMA_TOKEN=${DEFAULT_SIGMA_TOKEN}
+      - CHECK_INTERVAL_SECONDS=${CHECK_INTERVAL_SECONDS:-60}
+      - ENCRYPTION_MASTER_KEY=${ENCRYPTION_MASTER_KEY}
+    volumes:
+      # Persistent storage volume for database and encrypted token vault
+      - ./data:/app/data
