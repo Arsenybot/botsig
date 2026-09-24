@@ -12,9 +12,21 @@ import { UsersTable } from './components/UsersTable.js';
 import { ThresholdsModal } from './components/ThresholdsModal.js';
 import { LogsViewer } from './components/LogsViewer.js';
 import { BotInstructions } from './components/BotInstructions.js';
+import { LoginScreen } from './components/LoginScreen.js';
 import { WifiOff, RefreshCw } from 'lucide-react';
+import {
+  authFetch,
+  checkAdminSession,
+  getStoredToken,
+  getStoredUser,
+  logoutAdmin,
+  onAuthChange,
+} from './api.js';
 
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [adminUser, setAdminUser] = useState<{ username: string } | null>(getStoredUser());
+
   const [status, setStatus] = useState<BotStatus | null>(null);
   const [users, setUsers] = useState<BotUser[]>([]);
   const [logs, setLogs] = useState<BotLogEntry[]>([]);
@@ -35,9 +47,33 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+  // Check auth session on startup and subscribe to auth changes
+  useEffect(() => {
+    const token = getStoredToken();
+    if (!token) {
+      setIsAuthenticated(false);
+    } else {
+      checkAdminSession().then((valid) => {
+        setIsAuthenticated(valid);
+        if (valid) {
+          setAdminUser(getStoredUser());
+        }
+      });
+    }
+
+    const unsubscribe = onAuthChange((authed) => {
+      setIsAuthenticated(authed);
+      if (authed) {
+        setAdminUser(getStoredUser());
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/bot/status');
+      const res = await authFetch('/api/bot/status');
       if (res.ok) {
         const data = await res.json();
         setStatus(data);
@@ -46,14 +82,13 @@ export default function App() {
         setIsConnected(false);
       }
     } catch {
-      // Gracefully handle transient disconnects during server restart
       setIsConnected(false);
     }
   }, []);
 
   const fetchUsers = useCallback(async () => {
     try {
-      const res = await fetch('/api/bot/users');
+      const res = await authFetch('/api/bot/users');
       if (res.ok) {
         const data = await res.json();
         setUsers(data.users || []);
@@ -66,7 +101,7 @@ export default function App() {
 
   const fetchLogs = useCallback(async () => {
     try {
-      const res = await fetch('/api/bot/logs?limit=80');
+      const res = await authFetch('/api/bot/logs?limit=80');
       if (res.ok) {
         const data = await res.json();
         setLogs(data.logs || []);
@@ -87,17 +122,28 @@ export default function App() {
     }
   }, [fetchStatus, fetchUsers, fetchLogs]);
 
+  // Periodic polling only when authenticated
   useEffect(() => {
-    refreshAll();
-    const interval = setInterval(refreshAll, 3000);
-    return () => clearInterval(interval);
-  }, [refreshAll]);
+    if (isAuthenticated) {
+      refreshAll();
+      const interval = setInterval(refreshAll, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated, refreshAll]);
+
+  // Handler: logout
+  const handleLogout = async () => {
+    await logoutAdmin();
+    setIsAuthenticated(false);
+    setAdminUser(null);
+    showToast('Вы вышли из учетной записи администратора');
+  };
 
   // Handler: check all users
   const handleCheckAll = async () => {
     setIsCheckingAll(true);
     try {
-      const res = await fetch('/api/bot/check-all', { method: 'POST' });
+      const res = await authFetch('/api/bot/check-all', { method: 'POST' });
       const data = await res.json();
       if (data.success) {
         showToast(
@@ -116,7 +162,7 @@ export default function App() {
   const handleSimulateUsers = async (count: number) => {
     setIsSimulating(true);
     try {
-      const res = await fetch('/api/bot/simulate-users', {
+      const res = await authFetch('/api/bot/simulate-users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ count }),
@@ -136,7 +182,7 @@ export default function App() {
   // Handler: clear simulated users
   const handleClearSimulated = async () => {
     try {
-      const res = await fetch('/api/bot/simulate-users', {
+      const res = await authFetch('/api/bot/simulate-users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'clear' }),
@@ -155,7 +201,7 @@ export default function App() {
   const handleCheckUser = async (chatId: number) => {
     setCheckingUserChatId(chatId);
     try {
-      const res = await fetch(`/api/bot/check-user/${chatId}`, { method: 'POST' });
+      const res = await authFetch(`/api/bot/check-user/${chatId}`, { method: 'POST' });
       const data = await res.json();
       if (data.success) {
         showToast(
@@ -175,7 +221,7 @@ export default function App() {
   // Handler: send test alert
   const handleSendTestAlert = async (chatId: number, balance: number) => {
     try {
-      const res = await fetch('/api/bot/send-test-alert', {
+      const res = await authFetch('/api/bot/send-test-alert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chatId, threshold: 10, balance }),
@@ -195,7 +241,7 @@ export default function App() {
   // Handler: toggle threshold
   const handleToggleThreshold = async (chatId: number, value: number) => {
     try {
-      const res = await fetch(`/api/bot/user/${chatId}/thresholds`, {
+      const res = await authFetch(`/api/bot/user/${chatId}/thresholds`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'toggle', value }),
@@ -216,7 +262,7 @@ export default function App() {
   // Handler: add custom threshold
   const handleAddThreshold = async (chatId: number, value: number) => {
     try {
-      const res = await fetch(`/api/bot/user/${chatId}/thresholds`, {
+      const res = await authFetch(`/api/bot/user/${chatId}/thresholds`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'add', value }),
@@ -238,7 +284,7 @@ export default function App() {
   // Handler: reset thresholds
   const handleResetThresholds = async (chatId: number) => {
     try {
-      const res = await fetch(`/api/bot/user/${chatId}/thresholds`, {
+      const res = await authFetch(`/api/bot/user/${chatId}/thresholds`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'reset' }),
@@ -261,7 +307,7 @@ export default function App() {
   const handleToggleBotPower = async () => {
     setIsTogglingPower(true);
     try {
-      const res = await fetch('/api/bot/toggle-power', { method: 'POST' });
+      const res = await authFetch('/api/bot/toggle-power', { method: 'POST' });
       const data = await res.json();
       if (data.success) {
         showToast(
@@ -283,7 +329,7 @@ export default function App() {
   // Handler: clear history for all users
   const handleClearAllHistory = async () => {
     try {
-      const res = await fetch('/api/bot/history/clear-all', { method: 'POST' });
+      const res = await authFetch('/api/bot/history/clear-all', { method: 'POST' });
       const data = await res.json();
       if (data.success) {
         showToast('Вся история логов и событий у всех пользователей успешно очищена');
@@ -297,7 +343,7 @@ export default function App() {
   // Handler: clear history for single user
   const handleClearUserHistory = async (chatId: number) => {
     try {
-      const res = await fetch(`/api/bot/user/${chatId}/clear-history`, { method: 'POST' });
+      const res = await authFetch(`/api/bot/user/${chatId}/clear-history`, { method: 'POST' });
       const data = await res.json();
       if (data.success) {
         showToast(`История и логи пользователя ${chatId} очищены`);
@@ -311,7 +357,7 @@ export default function App() {
   // Handler: clear tokens for all users
   const handleClearAllTokens = async () => {
     try {
-      const res = await fetch('/api/bot/tokens/clear-all', { method: 'POST' });
+      const res = await authFetch('/api/bot/tokens/clear-all', { method: 'POST' });
       const data = await res.json();
       if (data.success) {
         showToast(`Сброшены и удалены токены у ${data.clearedCount} пользователей`);
@@ -325,7 +371,7 @@ export default function App() {
   // Handler: clear token for single user
   const handleClearUserToken = async (chatId: number) => {
     try {
-      const res = await fetch(`/api/bot/user/${chatId}/clear-token`, { method: 'POST' });
+      const res = await authFetch(`/api/bot/user/${chatId}/clear-token`, { method: 'POST' });
       const data = await res.json();
       if (data.success) {
         showToast(`Токен пользователя ${chatId} удален`);
@@ -339,7 +385,7 @@ export default function App() {
   // Handler: delete user completely
   const handleDeleteUser = async (chatId: number) => {
     try {
-      const res = await fetch(`/api/bot/user/${chatId}`, { method: 'DELETE' });
+      const res = await authFetch(`/api/bot/user/${chatId}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
         showToast(`Пользователь ${chatId} удален из базы данных`);
@@ -349,6 +395,29 @@ export default function App() {
       showToast('Ошибка при удалении пользователя');
     }
   };
+
+  // Loading state while checking session
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center gap-3">
+        <div className="w-9 h-9 border-3 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+        <span className="text-xs text-slate-400 font-medium">Проверка сессии администратора...</span>
+      </div>
+    );
+  }
+
+  // If unauthenticated, render the login screen
+  if (!isAuthenticated) {
+    return (
+      <LoginScreen
+        onSuccess={() => {
+          setIsAuthenticated(true);
+          setAdminUser(getStoredUser());
+          refreshAll();
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-blue-600 selection:text-white">
@@ -363,6 +432,8 @@ export default function App() {
         isSimulating={isSimulating}
         onTogglePower={handleToggleBotPower}
         isTogglingPower={isTogglingPower}
+        onLogout={handleLogout}
+        adminUsername={adminUser?.username || 'admin123'}
       />
 
       {/* Main Container */}

@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { BotStatus } from '../types.js';
-import { Bot, RefreshCw, Users, ExternalLink, Power, PowerOff, Trash2, KeyRound } from 'lucide-react';
+import { Bot, RefreshCw, Users, ExternalLink, Power, PowerOff, Trash2, KeyRound, LogOut, Shield } from 'lucide-react';
 
 interface HeaderProps {
   status: BotStatus | null;
@@ -18,6 +18,8 @@ interface HeaderProps {
   isTogglingPower?: boolean;
   onClearAllHistory?: () => void;
   onClearAllTokens?: () => void;
+  onLogout?: () => void;
+  adminUsername?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -31,6 +33,8 @@ export const Header: React.FC<HeaderProps> = ({
   isTogglingPower,
   onClearAllHistory,
   onClearAllTokens,
+  onLogout,
+  adminUsername,
 }) => {
   const [simCount, setSimCount] = useState<string>('');
   const isBotActive = status?.isBotActive !== false;
@@ -168,11 +172,30 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             id="btn-refresh-dashboard"
             onClick={onRefresh}
-            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition-colors"
+            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition-colors cursor-pointer"
             title="Обновить данные дашборда"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
+
+          {/* Admin User Badge & Logout */}
+          {onLogout && (
+            <div className="flex items-center gap-1 pl-1 border-l border-slate-800">
+              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-950/70 border border-slate-800 rounded-lg text-xs font-mono text-slate-300">
+                <Shield className="w-3.5 h-3.5 text-blue-400" />
+                <span>{adminUsername || 'admin123'}</span>
+              </div>
+              <button
+                id="btn-admin-logout"
+                onClick={onLogout}
+                className="px-2.5 py-2 bg-slate-800/80 hover:bg-rose-950/70 hover:border-rose-800/80 text-slate-300 hover:text-rose-300 border border-slate-700/80 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Выйти из учетной записи администратора"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Выйти</span>
+              </button>
+            </div>
+          )}
         </div>
 
       </div>

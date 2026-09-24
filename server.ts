@@ -12,6 +12,14 @@ import { getSigmaMe, getSigmaUserById, checkSigmaBalanceRealtime } from './serve
 import { telegramBot } from './server/telegram.js';
 import { balanceMonitor } from './server/monitor.js';
 import { tokenVault } from './server/security/vault.js';
+import {
+  validateAdminCredentials,
+  generateAdminToken,
+  verifyAdminToken,
+  revokeAdminToken,
+  requireAdminAuth,
+  ADMIN_USERNAME,
+} from './server/auth.js';
 
 dotenv.config();
 
@@ -56,7 +64,7 @@ async function startServer() {
 
   app.use(express.json());
 
-  // API Routes
+  // Public health check route (used by Docker and Cloud.ru)
   app.get('/api/health', (req, res) => {
     res.json({
       status: 'ok',
@@ -64,6 +72,57 @@ async function startServer() {
       timestamp: Date.now(),
     });
   });
+
+  // Public authentication routes
+  app.post('/api/auth/login', (req, res) => {
+    try {
+      const { username, password } = req.body || {};
+      if (!username || !password) {
+        return res.status(400).json({ success: false, message: 'Укажите логин и пароль' });
+      }
+
+      if (validateAdminCredentials(String(username), String(password))) {
+        const token = generateAdminToken(String(username).trim());
+        return res.json({
+          success: true,
+          token,
+          user: { username: String(username).trim() },
+        });
+      }
+
+      return res.status(401).json({
+        success: false,
+        message: 'Неверный логин или пароль администратора',
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err?.message || 'Ошибка сервера' });
+    }
+  });
+
+  app.get('/api/auth/me', (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7).trim();
+      const verification = verifyAdminToken(token);
+      if (verification.valid) {
+        return res.json({ authenticated: true, user: { username: verification.username } });
+      }
+    }
+    return res.json({ authenticated: false });
+  });
+
+  app.post('/api/auth/logout', (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7).trim();
+      revokeAdminToken(token);
+    }
+    return res.json({ success: true, message: 'Успешный выход' });
+  });
+
+  // Protect all bot management and SigmaSMS testing routes with requireAdminAuth
+  app.use('/api/bot', requireAdminAuth);
+  app.use('/api/sigmasms', requireAdminAuth);
 
   // Get full bot status
   app.get('/api/bot/status', (req, res) => {

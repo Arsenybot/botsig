@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { Play, Check, AlertCircle, Clock, Key, ArrowRight, ShieldCheck, Copy } from 'lucide-react';
+import { authFetch } from '../api.js';
 
 interface LiveTesterProps {
   defaultToken: string;
@@ -24,7 +25,7 @@ export const LiveTester: React.FC<LiveTesterProps> = ({ defaultToken }) => {
     setResult(null);
 
     try {
-      const res = await fetch('/api/sigmasms/test', {
+      const res = await authFetch('/api/sigmasms/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
