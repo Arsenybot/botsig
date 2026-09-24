@@ -344,8 +344,48 @@ async function startServer() {
     res.json({ success: sent });
   });
 
+  // Get Telegram bot token info for admin
+  app.get('/api/bot/token', (req, res) => {
+    try {
+      const config = storage.getConfig();
+      const botInfo = telegramBot.getBotInfo();
+      res.json({
+        token: config.telegramBotToken || '',
+        isPolling: telegramBot.isPolling(),
+        isBotActive: storage.isBotActive(),
+        botInfo,
+        defaultToken: '8948316828:AAEi6oVo9qm2nwt9YKxW46zhpN6Gqplld_0',
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Change Telegram bot token with instant Telegram API verification
+  app.post('/api/bot/token', async (req, res) => {
+    try {
+      const { token } = req.body;
+      if (!token || typeof token !== 'string' || !token.trim()) {
+        return res.status(400).json({ success: false, message: 'Токен бота не может быть пустым' });
+      }
+
+      const result = await telegramBot.updateToken(token.trim());
+      return res.json({
+        success: true,
+        message: `Токен успешно обновлен! Подключен бот @${result.botInfo.username} (${result.botInfo.firstName}).`,
+        botInfo: result.botInfo,
+      });
+    } catch (err: any) {
+      console.error('[API] Error updating bot token:', err.message);
+      return res.status(400).json({
+        success: false,
+        message: err.message || 'Ошибка проверки токена Telegram',
+      });
+    }
+  });
+
   // Update configuration
-  app.post('/api/bot/config', (req, res) => {
+  app.post('/api/bot/config', async (req, res) => {
     const { checkIntervalSeconds, telegramBotToken, defaultSigmaToken, maxConcurrentChecks } = req.body;
 
     const updates: any = {};
@@ -355,7 +395,11 @@ async function startServer() {
     }
     if (telegramBotToken && typeof telegramBotToken === 'string') {
       updates.telegramBotToken = telegramBotToken.trim();
-      telegramBot.updateToken(updates.telegramBotToken);
+      try {
+        await telegramBot.updateToken(updates.telegramBotToken);
+      } catch (err: any) {
+        return res.status(400).json({ success: false, message: `Ошибка токена бота: ${err.message}` });
+      }
     }
     if (defaultSigmaToken && typeof defaultSigmaToken === 'string') {
       updates.defaultSigmaToken = defaultSigmaToken.trim();

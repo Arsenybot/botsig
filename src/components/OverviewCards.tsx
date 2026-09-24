@@ -5,15 +5,21 @@
 
 import React from 'react';
 import { BotStatus } from '../types.js';
-import { Bot, Users, BellRing, Clock, CheckCircle2, AlertTriangle, Zap } from 'lucide-react';
+import { Bot, Users, BellRing, Clock, CheckCircle2, AlertTriangle, Zap, KeyRound } from 'lucide-react';
 
 interface OverviewCardsProps {
   status: BotStatus | null;
   onClearSimulated: () => void;
   hasSimulatedUsers?: boolean;
+  onChangeBotToken?: () => void;
 }
 
-export const OverviewCards: React.FC<OverviewCardsProps> = ({ status, onClearSimulated, hasSimulatedUsers }) => {
+export const OverviewCards: React.FC<OverviewCardsProps> = ({
+  status,
+  onClearSimulated,
+  hasSimulatedUsers,
+  onChangeBotToken,
+}) => {
   const stats = status?.stats;
   const isBotActive = status?.isBotActive !== false;
   const isOnline = isBotActive && status?.botInfo?.isOnline && status?.isPolling;
@@ -22,29 +28,55 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({ status, onClearSim
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       
       {/* Bot Identity Card */}
-      <div id="card-bot-status" className="bg-slate-900/80 border border-slate-800 rounded-xl p-4.5 shadow-sm">
-        <div className="flex items-center justify-between mb-2.5">
-          <span className="text-xs font-medium text-slate-400">Telegram Бот</span>
-          <div className={`w-8 h-8 rounded-lg border flex items-center justify-center ${
-            !isBotActive
-              ? 'bg-rose-500/10 border-rose-500/20 text-rose-400'
-              : 'bg-blue-500/10 border-blue-500/20 text-blue-400'
-          }`}>
-            <Bot className="w-4 h-4" />
+      <div id="card-bot-status" className="bg-slate-900/80 border border-slate-800 rounded-xl p-4.5 shadow-sm flex flex-col justify-between">
+        <div>
+          <div className="flex items-center justify-between mb-2.5">
+            <span className="text-xs font-medium text-slate-400">Telegram Бот</span>
+            <div className="flex items-center gap-1.5">
+              {onChangeBotToken && (
+                <button
+                  id="btn-bot-token-quick"
+                  onClick={onChangeBotToken}
+                  className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700/60 transition-colors"
+                  title="Сменить токен бота"
+                >
+                  <KeyRound className="w-3.5 h-3.5 text-blue-400" />
+                </button>
+              )}
+              <div className={`w-8 h-8 rounded-lg border flex items-center justify-center ${
+                !isBotActive
+                  ? 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+                  : 'bg-blue-500/10 border-blue-500/20 text-blue-400'
+              }`}>
+                <Bot className="w-4 h-4" />
+              </div>
+            </div>
+          </div>
+          <div className="text-lg font-bold text-white mb-1 flex items-center gap-2">
+            <span>@{status?.botInfo?.username || 'SigmaBa1ance_bot'}</span>
+            <span className={`w-2.5 h-2.5 rounded-full ${
+              !isBotActive ? 'bg-rose-500' : isOnline ? 'bg-emerald-400' : 'bg-amber-400'
+            }`} />
+          </div>
+          <div className="text-xs text-slate-400 space-y-1">
+            <p>Статус: <span className={!isBotActive ? 'text-rose-400 font-medium' : isOnline ? 'text-emerald-400 font-medium' : 'text-amber-400'}>
+              {!isBotActive ? 'Отключен в админке' : isOnline ? 'Активен (В сети)' : 'Инициализация'}
+            </span></p>
+            <p>ID: <span className="font-mono text-slate-300">{status?.botInfo?.id || '8948316828'}</span></p>
           </div>
         </div>
-        <div className="text-lg font-bold text-white mb-1 flex items-center gap-2">
-          <span>@{status?.botInfo?.username || 'SigmaBa1ance_bot'}</span>
-          <span className={`w-2.5 h-2.5 rounded-full ${
-            !isBotActive ? 'bg-rose-500' : isOnline ? 'bg-emerald-400' : 'bg-amber-400'
-          }`} />
-        </div>
-        <div className="text-xs text-slate-400 space-y-1">
-          <p>Статус: <span className={!isBotActive ? 'text-rose-400 font-medium' : isOnline ? 'text-emerald-400 font-medium' : 'text-amber-400'}>
-            {!isBotActive ? 'Отключен в админке' : isOnline ? 'Активен (В сети)' : 'Инициализация'}
-          </span></p>
-          <p>ID: <span className="font-mono text-slate-300">{status?.botInfo?.id || '8948316828'}</span></p>
-        </div>
+
+        {/* Change Token Button on Card */}
+        {onChangeBotToken && (
+          <button
+            id="btn-card-change-token"
+            onClick={onChangeBotToken}
+            className="mt-3 w-full py-1.5 px-3 rounded-lg bg-slate-800/80 hover:bg-slate-700/90 border border-slate-700/80 text-slate-300 hover:text-white text-xs font-medium flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+          >
+            <KeyRound className="w-3.5 h-3.5 text-blue-400" />
+            <span>Сменить токен бота</span>
+          </button>
+        )}
       </div>
 
       {/* Users Capacity Card */}

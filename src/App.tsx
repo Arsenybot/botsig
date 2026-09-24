@@ -10,6 +10,7 @@ import { OverviewCards } from './components/OverviewCards.js';
 import { LiveTester } from './components/LiveTester.js';
 import { UsersTable } from './components/UsersTable.js';
 import { ThresholdsModal } from './components/ThresholdsModal.js';
+import { ChangeBotTokenModal } from './components/ChangeBotTokenModal.js';
 import { LogsViewer } from './components/LogsViewer.js';
 import { BotInstructions } from './components/BotInstructions.js';
 import { LoginScreen } from './components/LoginScreen.js';
@@ -38,6 +39,7 @@ export default function App() {
   const [checkingUserChatId, setCheckingUserChatId] = useState<number | null>(null);
   
   const [selectedUserForThresholds, setSelectedUserForThresholds] = useState<BotUser | null>(null);
+  const [isTokenModalOpen, setIsTokenModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const isRefreshingRef = useRef(false);
@@ -469,6 +471,7 @@ export default function App() {
           status={status}
           onClearSimulated={handleClearSimulated}
           hasSimulatedUsers={users.some((u) => u.isSimulated || u.sigmaUserId?.startsWith('sim-') || u.chatId >= 100000000)}
+          onChangeBotToken={() => setIsTokenModalOpen(true)}
         />
 
         {/* Bot Instructions */}
@@ -508,6 +511,19 @@ export default function App() {
           onToggleThreshold={handleToggleThreshold}
           onAddThreshold={handleAddThreshold}
           onResetThresholds={handleResetThresholds}
+        />
+      )}
+
+      {/* Change Bot Token Modal */}
+      {isTokenModalOpen && (
+        <ChangeBotTokenModal
+          status={status}
+          onClose={() => setIsTokenModalOpen(false)}
+          onTokenUpdated={() => {
+            fetchStatus();
+            fetchLogs();
+            showToast('Токен Telegram-бота успешно обновлен!');
+          }}
         />
       )}
 

@@ -44,13 +44,63 @@ class TelegramBotService {
     return this.isRunning;
   }
 
-  public updateToken(newToken: string) {
-    this.token = newToken.trim();
-    storage.updateConfig({ telegramBotToken: this.token });
-    if (this.isRunning) {
-      this.stop();
-      this.start();
+  public async verifyToken(candidateToken: string): Promise<TelegramBotInfo> {
+    const cleanToken = candidateToken.trim();
+    if (!cleanToken) {
+      throw new Error('Токен бота не может быть пустым');
     }
+    const url = `${TELEGRAM_API_BASE}/bot${cleanToken}/getMe`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(10000),
+    });
+    const data = await response.json();
+    if (!data.ok || !data.result) {
+      const desc = data.description || 'Не удалось авторизоваться в Telegram API';
+      throw new Error(`Ошибка Telegram API: ${desc}`);
+    }
+    const me = data.result;
+    return {
+      id: me.id,
+      username: me.username,
+      firstName: me.first_name,
+      isOnline: true,
+    };
+  }
+
+  public async updateToken(newToken: string): Promise<{ success: boolean; botInfo: TelegramBotInfo }> {
+    const cleanToken = newToken.trim();
+    if (!cleanToken) {
+      throw new Error('Токен бота не может быть пустым');
+    }
+
+    // 1. First verify candidate token with Telegram getMe
+    const verifiedBotInfo = await this.verifyToken(cleanToken);
+
+    // 2. Stop running bot polling before replacing token
+    this.stop();
+
+    // 3. Update token and persist into database
+    this.token = cleanToken;
+    storage.updateConfig({ telegramBotToken: this.token });
+    this.botInfo = verifiedBotInfo;
+    this.pollOffset = 0; // reset poll offset for clean updates on new bot
+
+    // 4. Start polling if bot is marked active
+    if (storage.isBotActive()) {
+      this.isRunning = true;
+      this.abortController = new AbortController();
+      this.pollLoop();
+    }
+
+    console.log(`[Telegram] Bot token updated. Connected as @${verifiedBotInfo.username} (ID: ${verifiedBotInfo.id}).`);
+    storage.logEvent({
+      type: 'info',
+      message: `Токен бота успешно обновлен. Бот @${verifiedBotInfo.username} (${verifiedBotInfo.firstName}, ID: ${verifiedBotInfo.id}) запущен.`,
+    });
+
+    return { success: true, botInfo: verifiedBotInfo };
   }
 
   public async start() {
@@ -1034,18 +1084,21 @@ class TelegramBotService {
 
   public async sendMessage(chatId: number, text: string, options: any = {}) {
     const parseMode = options.parse_mode !== undefined ? options.parse_mode : 'HTML';
+    const payload: any = {
+      chat_id: chatId,
+      text,
+      parse_mode: parseMode,
+      link_preview_options: options.link_preview_options !== undefined ? options.link_preview_options : { is_disabled: true },
+      disable_web_page_preview: options.disable_web_page_preview !== undefined ? options.disable_web_page_preview : true,
+      ...options,
+    };
     try {
-      return await this.apiCall('sendMessage', {
-        chat_id: chatId,
-        text,
-        parse_mode: parseMode,
-        ...options,
-      });
+      return await this.apiCall('sendMessage', payload);
     } catch (err: any) {
       if (parseMode && err.message?.includes("can't parse entities")) {
         console.warn(`[Telegram] HTML/Markdown parse failed, fallback to plain text:`, err.message);
         const plainText = text.replace(/<[^>]*>/g, '');
-        const { parse_mode, ...restOptions } = options;
+        const { parse_mode, ...restOptions } = payload;
         return await this.apiCall('sendMessage', {
           chat_id: chatId,
           text: plainText,
@@ -1058,19 +1111,22 @@ class TelegramBotService {
 
   public async editMessage(chatId: number, messageId: number, text: string, options: any = {}) {
     const parseMode = options.parse_mode !== undefined ? options.parse_mode : 'HTML';
+    const payload: any = {
+      chat_id: chatId,
+      message_id: messageId,
+      text,
+      parse_mode: parseMode,
+      link_preview_options: options.link_preview_options !== undefined ? options.link_preview_options : { is_disabled: true },
+      disable_web_page_preview: options.disable_web_page_preview !== undefined ? options.disable_web_page_preview : true,
+      ...options,
+    };
     try {
-      return await this.apiCall('editMessageText', {
-        chat_id: chatId,
-        message_id: messageId,
-        text,
-        parse_mode: parseMode,
-        ...options,
-      });
+      return await this.apiCall('editMessageText', payload);
     } catch (err: any) {
       if (parseMode && err.message?.includes("can't parse entities")) {
         console.warn(`[Telegram] HTML/Markdown edit failed, fallback to plain text:`, err.message);
         const plainText = text.replace(/<[^>]*>/g, '');
-        const { parse_mode, ...restOptions } = options;
+        const { parse_mode, ...restOptions } = payload;
         try {
           return await this.apiCall('editMessageText', {
             chat_id: chatId,
