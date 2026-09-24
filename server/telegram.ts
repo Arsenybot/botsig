@@ -86,6 +86,13 @@ class TelegramBotService {
       return;
     }
 
+    try {
+      await this.apiCall('deleteWebhook', { drop_pending_updates: true });
+      console.log('[Telegram] Webhook cleared before starting polling.');
+    } catch (e) {
+      console.warn('[Telegram] Could not delete webhook (probably none set):', e);
+    }
+    
     this.isRunning = true;
     this.abortController = new AbortController();
     this.pollLoop();
