@@ -14,7 +14,6 @@ COPY vite.config.ts ./
 COPY server.ts ./
 COPY server ./server
 COPY src ./src
-COPY public ./public
 
 # Build frontend (Vite) and server (esbuild bundle -> dist/server.cjs)
 RUN npm run build
