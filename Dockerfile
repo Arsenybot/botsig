@@ -6,7 +6,7 @@ WORKDIR /app
 # Install dependencies needed for build
 COPY package*.json ./
 COPY tsconfig*.json ./
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 # Copy source code and build config
 COPY index.html ./
@@ -29,7 +29,7 @@ ENV PORT=3000
 
 # Install production dependencies only
 COPY package*.json ./
-RUN npm install --omit=dev && npm cache clean --force
+RUN npm install --omit=dev --legacy-peer-deps && npm cache clean --force
 
 # Copy compiled bundles from builder stage
 COPY --from=builder /app/dist ./dist
