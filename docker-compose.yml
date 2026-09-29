@@ -7,13 +7,23 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    env_file:
+      - path: .env
+        required: false
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - DEFAULT_SIGMA_TOKEN=${DEFAULT_SIGMA_TOKEN}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-8948316828:AAEi6oVo9qm2nwt9YKxW46zhpN6Gqplld_0}
+      - DEFAULT_SIGMA_TOKEN=${DEFAULT_SIGMA_TOKEN:-}
       - CHECK_INTERVAL_SECONDS=${CHECK_INTERVAL_SECONDS:-60}
-      - ENCRYPTION_MASTER_KEY=${ENCRYPTION_MASTER_KEY}
+      - ENCRYPTION_MASTER_KEY=${ENCRYPTION_MASTER_KEY:-}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin123}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-qwerty0912}
     volumes:
-      # Persistent storage volume for database and encrypted token vault
-      - ./data:/app/data
+      # Persistent Docker volume (сохраняет базу и зашифрованные токены при любых редеплоях)
+      - sigmabot_data:/app/data
+
+volumes:
+  sigmabot_data:
+    name: sigmabalance_bot_data
+

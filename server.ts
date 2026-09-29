@@ -33,19 +33,22 @@ process.on('unhandledRejection', (reason) => {
   console.error('[Process] Unhandled rejection:', reason);
 });
 
-// Ensure database is flushed to disk cleanly before exit
+// Ensure database and encrypted vault are flushed to disk cleanly before exit
 process.on('SIGTERM', () => {
-  console.log('[Process] SIGTERM received. Flushing database before exit...');
+  console.log('[Process] SIGTERM received. Flushing database and vault before exit...');
   storage.flushSave();
+  tokenVault.flushVault();
   process.exit(0);
 });
 process.on('SIGINT', () => {
-  console.log('[Process] SIGINT received. Flushing database before exit...');
+  console.log('[Process] SIGINT received. Flushing database and vault before exit...');
   storage.flushSave();
+  tokenVault.flushVault();
   process.exit(0);
 });
 process.on('beforeExit', () => {
   storage.flushSave();
+  tokenVault.flushVault();
 });
 
 async function startServer() {
